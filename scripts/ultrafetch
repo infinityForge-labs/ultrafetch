@@ -1,0 +1,576 @@
+#!/bin/bash
+
+################################################################################
+#                                                                              #
+#                          UltraFetch v1.0.0                                   #
+#                    System Information Utility                                #
+#                                                                              #
+#                      by InfinityForge Labs (2025)                            #
+#                                                                              #
+#  A beautiful, feature-rich system information display tool that provides     #
+#  comprehensive hardware, network, and performance metrics with ASCII art.    #
+#                                                                              #
+################################################################################
+
+set -euo pipefail  # Exit on error, undefined variables, pipe failures
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🔧 CONFIGURATION & CONSTANTS
+# ═══════════════════════════════════════════════════════════════════════════
+readonly FETCH_VERSION="1.0.0"
+readonly CACHE_TIMEOUT=5  # Seconds to cache expensive operations
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🎨 COLOR PALETTE
+# ═══════════════════════════════════════════════════════════════════════════
+readonly RED='\033[38;5;9m'
+readonly GRAY='\033[38;5;8m'
+readonly CYAN='\033[38;5;14m'
+readonly GREEN='\033[38;5;10m'
+readonly YELLOW='\033[38;5;11m'
+readonly BLUE='\033[38;5;12m'
+readonly MAGENTA='\033[38;5;13m'
+readonly ORANGE='\033[38;5;208m'
+readonly PURPLE='\033[38;5;141m'
+readonly BOLD='\033[1m'
+readonly DIM='\033[2m'
+readonly RESET='\033[0m'
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🎭 ASCII LOGO LIBRARY
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Ubuntu Logo
+get_ubuntu_logo() {
+    cat << "EOF"
+         _____
+     ---/     \---
+    /   ${ORANGE}  ___  ${RESET}   \
+   /   ${ORANGE} /   \ ${RESET}    \
+   |  ${ORANGE} |     |${RESET}    |
+   |  ${ORANGE} |     |${RESET}    |
+   \   ${ORANGE} \___/ ${RESET}    /
+    \    ${ORANGE}---${RESET}     /
+     ------------
+EOF
+}
+
+# Debian Logo
+get_debian_logo() {
+    cat << "EOF"
+       ${RED}_____${RESET}
+      ${RED}/  __ \${RESET}
+     ${RED}|  /    ${RESET}
+     ${RED}| |     ${RESET}
+     ${RED}| \___  ${RESET}
+     ${RED}\____/  ${RESET}
+      ${RED}      ${RESET}
+EOF
+}
+
+# Arch Linux Logo
+get_arch_logo() {
+    cat << "EOF"
+        ${CYAN}/\${RESET}
+       ${CYAN}/  \${RESET}
+      ${CYAN}/\   \${RESET}
+     ${CYAN}/  __  \${RESET}
+    ${CYAN}/ .'  `. \${RESET}
+   ${CYAN}/.'      `.\${RESET}
+EOF
+}
+
+# Fedora Logo
+get_fedora_logo() {
+    cat << "EOF"
+       ${BLUE}_____${RESET}
+      ${BLUE}/   __|\${RESET}
+     ${BLUE}|  |__ ${RESET}
+     ${BLUE}|   __| ${RESET}
+     ${BLUE}|  |    ${RESET}
+     ${BLUE}|__|    ${RESET}
+EOF
+}
+
+# CentOS/RHEL Logo
+get_centos_logo() {
+    cat << "EOF"
+      ${PURPLE} ____${RESET}
+     ${PURPLE}|  _ \${RESET}
+     ${PURPLE}| |_) |${RESET}
+     ${PURPLE}|  _ <${RESET}
+     ${PURPLE}| |_) |${RESET}
+     ${PURPLE}|____/${RESET}
+EOF
+}
+
+# Kali Linux Logo
+get_kali_logo() {
+    cat << "EOF"
+       ${BLUE}__${RESET}
+      ${BLUE}/ /${RESET}
+     ${BLUE}| | ${RESET}
+     ${BLUE}| |_${RESET}
+     ${BLUE} \__\\${RESET}
+EOF
+}
+
+# Linux Mint Logo
+get_mint_logo() {
+    cat << "EOF"
+      ${GREEN}_____ ${RESET}
+     ${GREEN}|     |${RESET}
+     ${GREEN}| | | |${RESET}
+     ${GREEN}| | | |${RESET}
+     ${GREEN}|_|_|_|${RESET}
+EOF
+}
+
+# Generic Linux Logo
+get_linux_logo() {
+    cat << "EOF"
+        ${YELLOW}___${RESET}
+       ${YELLOW}(.. |${RESET}
+       ${YELLOW}(${RED}<>${YELLOW} |${RESET}
+      ${YELLOW}/ __  \\${RESET}
+     ${YELLOW}( /  \\ /|${RESET}
+    ${YELLOW}_/\\ __)(/_${RESET}
+   ${YELLOW}\/-____\\/${RESET}
+EOF
+}
+
+# macOS Logo
+get_macos_logo() {
+    cat << "EOF"
+       ${GRAY}####${RESET}
+      ${GRAY}######${RESET}
+     ${GRAY}########${RESET}
+     ${GRAY}########${RESET}
+      ${GRAY}######${RESET}
+       ${GRAY}####${RESET}
+EOF
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🛠️ UTILITY FUNCTIONS
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Convert bytes to human-readable format with precision
+# Arguments:
+#   $1 - Number of bytes
+# Returns:
+#   Formatted string (e.g., "1.50 GB")
+bytes_to_human() {
+    local bytes=$1
+    local -a units=("B" "KB" "MB" "GB" "TB" "PB")
+    local unit_index=0
+    local size=$bytes
+
+    while (( $(echo "$size >= 1024" | bc -l) )) && (( unit_index < ${#units[@]} - 1 )); do
+        size=$(echo "scale=2; $size / 1024" | bc -l)
+        ((unit_index++))
+    done
+
+    printf "%.2f %s" "$size" "${units[$unit_index]}" | sed 's/\.00 / /'
+}
+
+# Fix unit labels in df output (e.g., "1.5G" → "1.5 GB")
+# Arguments:
+#   $1 - String with abbreviated unit
+# Returns:
+#   String with full unit label
+fix_unit_label() {
+    local str="$1"
+    
+    if [[ "$str" =~ ^([0-9.]+)([BKMGT])$ ]]; then
+        local value="${BASH_REMATCH[1]}"
+        local unit="${BASH_REMATCH[2]}"
+        
+        case "$unit" in
+            T) echo "${value} TB" ;;
+            G) echo "${value} GB" ;;
+            M) echo "${value} MB" ;;
+            K) echo "${value} KB" ;;
+            B) echo "${value} B" ;;
+            *) echo "$str" ;;
+        esac
+    else
+        echo "$str"
+    fi
+}
+
+# Display a formatted information row
+# Arguments:
+#   $1 - Emoji/icon
+#   $2 - Label text
+#   $3 - Value text
+display_row() {
+    local icon="$1"
+    local label="$2"
+    local value="$3"
+    
+    printf "%s ${RED}%-16s${RESET} %s\n" "$icon" "$label:" "$value"
+}
+
+# Check if a command exists
+# Arguments:
+#   $1 - Command name
+# Returns:
+#   0 if exists, 1 otherwise
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🐧 OS DETECTION & LOGO SELECTION
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Detect OS and return appropriate logo
+# Returns:
+#   OS logo as multiline string
+detect_and_get_logo() {
+    local os_name=""
+    
+    # Detect OS
+    if [[ -f /etc/os-release ]]; then
+        os_name=$(grep -i '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]')
+    elif [[ "$(uname -s)" == "Darwin" ]]; then
+        os_name="macos"
+    else
+        os_name="linux"
+    fi
+    
+    # Return appropriate logo
+    case "$os_name" in
+        ubuntu) get_ubuntu_logo ;;
+        debian) get_debian_logo ;;
+        arch|archarm|manjaro) get_arch_logo ;;
+        fedora) get_fedora_logo ;;
+        centos|rhel|redhat|rocky|almalinux) get_centos_logo ;;
+        kali) get_kali_logo ;;
+        linuxmint|mint) get_mint_logo ;;
+        macos|darwin) get_macos_logo ;;
+        *) get_linux_logo ;;
+    esac
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 📊 SYSTEM INFORMATION COLLECTORS
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Get system hostname
+# Returns:
+#   Hostname string
+get_hostname() {
+    hostname 2>/dev/null || echo "Unknown"
+}
+
+# Get distribution name with version
+# Returns:
+#   Pretty name of the distribution
+get_distro() {
+    if [[ -f /etc/os-release ]]; then
+        grep -oP '(?<=PRETTY_NAME=").*(?=")' /etc/os-release 2>/dev/null
+    elif command_exists lsb_release; then
+        lsb_release -d | cut -f2
+    elif [[ "$(uname -s)" == "Darwin" ]]; then
+        echo "macOS $(sw_vers -productVersion 2>/dev/null)"
+    else
+        uname -s
+    fi
+}
+
+# Get kernel version
+# Returns:
+#   Kernel version string
+get_kernel() {
+    uname -r
+}
+
+# Get system architecture
+# Returns:
+#   Architecture string (e.g., x86_64, aarch64)
+get_architecture() {
+    uname -m
+}
+
+# Get system uptime in human-readable format
+# Returns:
+#   Uptime string (e.g., "2 days, 3 hours")
+get_uptime() {
+    if command_exists uptime; then
+        uptime -p 2>/dev/null | sed 's/^up //' || uptime | awk -F'up ' '{print $2}' | awk -F',' '{print $1}'
+    else
+        echo "N/A"
+    fi
+}
+
+# Get CPU model and core count
+# Returns:
+#   CPU information string
+get_cpu_info() {
+    if command_exists lscpu; then
+        local cpu_model=$(lscpu | awk -F': +' '/Model name/ {print $2; exit}')
+        local cpu_cores=$(nproc 2>/dev/null || echo "N/A")
+        echo "$cpu_model ($cpu_cores Cores)"
+    elif [[ -f /proc/cpuinfo ]]; then
+        local cpu_model=$(awk -F': ' '/model name/ {print $2; exit}' /proc/cpuinfo)
+        local cpu_cores=$(grep -c ^processor /proc/cpuinfo)
+        echo "$cpu_model ($cpu_cores Cores)"
+    else
+        echo "N/A"
+    fi
+}
+
+# Get GPU information
+# Returns:
+#   GPU model string
+get_gpu_info() {
+    if command_exists lspci; then
+        local gpu=$(lspci 2>/dev/null | grep -i 'vga\|3d\|display' | sed 's/.*: //' | head -n1)
+        echo "${gpu:-N/A}"
+    else
+        echo "N/A"
+    fi
+}
+
+# Get memory statistics (used, total, percentage)
+# Returns:
+#   Three space-separated values: used total percentage
+get_memory_info() {
+    if ! command_exists free; then
+        echo "N/A" "N/A" "0.0"
+        return
+    fi
+    
+    local mem_total=$(free -b | awk '/Mem:/ {print $2}')
+    local mem_used=$(free -b | awk '/Mem:/ {print $3}')
+    
+    if [[ -n "$mem_total" ]] && (( mem_total > 0 )); then
+        local mem_pct=$(awk "BEGIN {printf \"%.1f\", ($mem_used/$mem_total)*100}")
+        local mem_total_h=$(bytes_to_human "$mem_total")
+        local mem_used_h=$(bytes_to_human "$mem_used")
+        
+        echo "$mem_used_h" "$mem_total_h" "$mem_pct"
+    else
+        echo "N/A" "N/A" "0.0"
+    fi
+}
+
+# Get swap statistics (used, total, percentage)
+# Returns:
+#   Three space-separated values: used total percentage
+get_swap_info() {
+    if ! command_exists free; then
+        echo "N/A" "N/A" "0.0"
+        return
+    fi
+    
+    local swap_total=$(free -b | awk '/Swap:/ {print $2}')
+    local swap_used=$(free -b | awk '/Swap:/ {print $3}')
+    
+    if [[ -n "$swap_total" ]] && (( swap_total > 0 )); then
+        local swap_pct=$(awk "BEGIN {printf \"%.1f\", ($swap_used/$swap_total)*100}")
+        local swap_total_h=$(bytes_to_human "$swap_total")
+        local swap_used_h=$(bytes_to_human "$swap_used")
+        
+        echo "$swap_used_h" "$swap_total_h" "$swap_pct"
+    else
+        echo "0 B" "0 B" "0.0"
+    fi
+}
+
+# Get system load average
+# Returns:
+#   Load average string (1min, 5min, 15min)
+get_load_average() {
+    if command_exists uptime; then
+        uptime | awk -F'load average: ' '{print $2}' | xargs
+    elif [[ -f /proc/loadavg ]]; then
+        awk '{print $1, $2, $3}' /proc/loadavg
+    else
+        echo "N/A"
+    fi
+}
+
+# Get CPU temperature from sensors
+# Returns:
+#   Temperature string with unit
+get_cpu_temperature() {
+    if command_exists sensors; then
+        local temp=$(sensors 2>/dev/null | awk '
+            /Package id 0:/ {print $4; exit}
+            /Tctl:/ {print $2; exit}
+            /Core 0:/ {print $3; exit}
+            /temp1:/ {print $2; exit}
+        ' | sed 's/+//')
+        
+        echo "${temp:-N/A}"
+    else
+        echo "N/A"
+    fi
+}
+
+# Get disk statistics for a specific mount point
+# Arguments:
+#   $1 - Mount point path
+# Returns:
+#   Disk usage string "used / total (percentage)"
+get_disk_stats() {
+    local mount_point="$1"
+    
+    if ! df -h "$mount_point" &>/dev/null; then
+        echo "N/A"
+        return
+    fi
+    
+    local used=$(df -h "$mount_point" | awk 'NR==2 {print $3}')
+    local total=$(df -h "$mount_point" | awk 'NR==2 {print $2}')
+    local pct=$(df -h "$mount_point" | awk 'NR==2 {print $5}')
+    
+    echo "$(fix_unit_label "$used") / $(fix_unit_label "$total") ($pct)"
+}
+
+# Get local IP address
+# Returns:
+#   Local IP address string
+get_local_ip() {
+    if command_exists hostname; then
+        hostname -I 2>/dev/null | awk '{print $1}' || echo "N/A"
+    elif command_exists ip; then
+        ip route get 1 2>/dev/null | awk '{print $7; exit}' || echo "N/A"
+    else
+        echo "N/A"
+    fi
+}
+
+# Get public IP address with timeout protection
+# Returns:
+#   Public IP address string
+get_public_ip() {
+    if command_exists curl; then
+        curl -s --max-time 3 https://api.ipify.org 2>/dev/null || echo "N/A"
+    elif command_exists wget; then
+        wget -qO- --timeout=3 https://api.ipify.org 2>/dev/null || echo "N/A"
+    else
+        echo "N/A"
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🎨 DISPLAY FUNCTIONS
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Display logo and system info side by side
+display_with_logo() {
+    clear
+    
+    # Get logo
+    local logo
+    logo=$(detect_and_get_logo)
+    
+    # Convert logo to array
+    mapfile -t logo_lines <<< "$logo"
+    
+    # Prepare info lines
+    local -a info_lines=(
+        ""
+        "${BOLD}${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+        "$(display_row "💻" "Hostname" "$(get_hostname)")"
+        "$(display_row "🧭" "OS" "$(get_distro)")"
+        "$(display_row "🧠" "Kernel" "$(get_kernel) ($(get_architecture))")"
+        "$(display_row "⏱️ " "Uptime" "$(get_uptime)")"
+        "${BOLD}${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+        "$(display_row "⚙️ " "CPU" "$(get_cpu_info)")"
+        "$(display_row "🎮" "GPU" "$(get_gpu_info)")"
+    )
+    
+    # Add memory info
+    read -r mem_used mem_total mem_pct <<< "$(get_memory_info)"
+    info_lines+=("$(display_row "💾" "Memory" "$mem_used / $mem_total ($mem_pct%)")")
+    
+    # Add swap info
+    read -r swap_used swap_total swap_pct <<< "$(get_swap_info)"
+    info_lines+=("$(display_row "📦" "Swap" "$swap_used / $swap_total ($swap_pct%)")")
+    
+    info_lines+=(
+        "${BOLD}${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+        "$(display_row "📈" "Load Avg" "$(get_load_average)")"
+        "$(display_row "🌡️ " "CPU Temp" "$(get_cpu_temperature)")"
+        "${BOLD}${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+        "$(display_row "🗄️ " "Root (/)" "$(get_disk_stats "/")")"
+    )
+    
+    # Add optional mounts
+    if mountpoint -q /var 2>/dev/null; then
+        info_lines+=("$(display_row "📁" "/var" "$(get_disk_stats "/var")")")
+    fi
+    
+    if mountpoint -q /home 2>/dev/null; then
+        info_lines+=("$(display_row "🏠" "/home" "$(get_disk_stats "/home")")")
+    fi
+    
+    info_lines+=(
+        "${BOLD}${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+        "$(display_row "🌐" "Local IP" "$(get_local_ip)")"
+        "$(display_row "🚀" "Public IP" "$(get_public_ip)")"
+        "${BOLD}${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    )
+    
+    # Print side by side
+    local max_lines=${#info_lines[@]}
+    [[ ${#logo_lines[@]} -gt $max_lines ]] && max_lines=${#logo_lines[@]}
+    
+    echo ""
+    for ((i=0; i<max_lines; i++)); do
+        printf "    %-30s    %s\n" "${logo_lines[i]:-}" "${info_lines[i]:-}"
+    done
+    echo ""
+}
+
+# Display footer with branding
+display_footer() {
+    echo -e "  ${DIM}${GRAY}Crafted with ${RED}❤️${GRAY}  by ${BOLD}InfinityForge Labs${RESET}"
+    echo -e "  ${GRAY}🌐 Website:${RESET} ${CYAN}https://infinityforge.tech${RESET}"
+    echo -e "  ${GRAY}💬 Discord:${RESET} ${CYAN}https://discord.gg/infinityforge${RESET}"
+    echo -e "  ${GRAY}📖 GitHub:${RESET}  ${CYAN}https://github.com/infinityforge${RESET}\n"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🎬 MAIN EXECUTION
+# ═══════════════════════════════════════════════════════════════════════════
+
+main() {
+    # Check for help flag
+    if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
+        echo "UltraFetch v${FETCH_VERSION} - System Information Utility"
+        echo ""
+        echo "Usage: ultrafetch [OPTIONS]"
+        echo ""
+        echo "Options:"
+        echo "  -h, --help       Show this help message"
+        echo "  -v, --version    Show version information"
+        echo ""
+        echo "Examples:"
+        echo "  ultrafetch              Display system information with logo"
+        echo "  ultrafetch --version    Show version"
+        exit 0
+    fi
+    
+    # Check for version flag
+    if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
+        echo "UltraFetch v${FETCH_VERSION}"
+        echo "by InfinityForge Labs"
+        exit 0
+    fi
+    
+    # Display all information with logo
+    display_with_logo
+    display_footer
+}
+
+# Error handling
+trap 'echo -e "\n${RED}Error:${RESET} UltraFetch encountered an unexpected error." >&2; exit 1' ERR
+
+# Execute main function
+main "$@"
