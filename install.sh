@@ -27,7 +27,7 @@ readonly NC='\033[0m'  # No Color
 # 📋 CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════
 readonly INSTALL_PATH="/usr/local/bin/ultrafetch"
-readonly FETCH_URL="https://github.com/infinityForge-labs/ultrafetch/scripts/ultrafetch"
+readonly FETCH_URL="https://raw.githubusercontent.com/infinityForge-labs/ultrafetch/refs/heads/main/scripts/ultrafetch"
 readonly SCRIPT_VERSION="1.0"
 readonly MIN_BASH_VERSION=4
 
