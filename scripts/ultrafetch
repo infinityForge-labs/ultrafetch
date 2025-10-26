@@ -1,0 +1,1258 @@
+#!/bin/bash
+
+################################################################################
+#                                                                              #
+#                          UltraFetch v3.0.1                                   #
+#                 Ultimate Professional System Information Tool                #
+#                                                                              #
+#                      © InfinityForge Labs (2025)                             #
+#                                                                              #
+#  Enterprise-grade system diagnostics with 40+ OS support, real-time        #
+#  metrics, intelligent caching, and stunning visual presentation.            #
+#                                                                              #
+################################################################################
+
+set -euo pipefail
+IFS=$'\n\t'
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🔧 CONFIGURATION & CONSTANTS
+# ═══════════════════════════════════════════════════════════════════════════
+readonly FETCH_VERSION="3.0.1"
+readonly FETCH_BUILD="20251026-STABLE"
+readonly FETCH_AUTHOR="InfinityForge Labs"
+readonly CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/ultrafetch"
+readonly CACHE_TIMEOUT=300  # 5 minutes
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🎨 PROFESSIONAL COLOR SCHEME
+# ═══════════════════════════════════════════════════════════════════════════
+readonly C_RED='\033[38;5;196m'
+readonly C_DARKRED='\033[38;5;124m'
+readonly C_GRAY='\033[38;5;240m'
+readonly C_DARKGRAY='\033[38;5;235m'
+readonly C_LIGHTGRAY='\033[38;5;250m'
+readonly C_CYAN='\033[38;5;51m'
+readonly C_DARKCYAN='\033[38;5;37m'
+readonly C_GREEN='\033[38;5;46m'
+readonly C_DARKGREEN='\033[38;5;28m'
+readonly C_YELLOW='\033[38;5;226m'
+readonly C_GOLD='\033[38;5;220m'
+readonly C_BLUE='\033[38;5;33m'
+readonly C_DARKBLUE='\033[38;5;21m'
+readonly C_MAGENTA='\033[38;5;201m'
+readonly C_DARKMAGENTA='\033[38;5;127m'
+readonly C_ORANGE='\033[38;5;208m'
+readonly C_PURPLE='\033[38;5;141m'
+readonly C_PINK='\033[38;5;205m'
+readonly C_LIME='\033[38;5;118m'
+readonly C_TEAL='\033[38;5;87m'
+readonly C_BOLD='\033[1m'
+readonly C_DIM='\033[2m'
+readonly C_ITALIC='\033[3m'
+readonly C_UNDERLINE='\033[4m'
+readonly C_BLINK='\033[5m'
+readonly C_RESET='\033[0m'
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🎭 ENHANCED ASCII LOGO LIBRARY (40+ SYSTEMS)
+# ═══════════════════════════════════════════════════════════════════════════
+
+get_ubuntu_logo() {
+    echo -e "
+         ${C_ORANGE}███████╗${C_RESET}
+        ${C_ORANGE}██╔════╝${C_RESET}
+        ${C_ORANGE}███████╗${C_RESET}
+        ${C_ORANGE}╚════██║${C_RESET}
+        ${C_ORANGE}███████║${C_RESET}
+        ${C_ORANGE}╚══════╝${C_RESET}
+         ${C_ORANGE}${C_BOLD}Ubuntu${C_RESET}"
+}
+
+get_debian_logo() {
+    echo -e "
+         ${C_RED}  _____${C_RESET}
+        ${C_RED} /  __ \\${C_RESET}
+       ${C_RED}|  /    \`${C_RESET}
+       ${C_RED}|  \\___-.${C_RESET}
+        ${C_RED}-_    )|${C_RESET}
+         ${C_RED} --__-'${C_RESET}
+          ${C_RED}${C_BOLD}Debian${C_RESET}"
+}
+
+get_arch_logo() {
+    echo -e "
+          ${C_CYAN}▲${C_RESET}
+         ${C_CYAN}▲▲▲${C_RESET}
+        ${C_CYAN}▲▲▲▲▲${C_RESET}
+       ${C_CYAN}▲▲${C_DARKCYAN}███${C_CYAN}▲▲${C_RESET}
+      ${C_CYAN}▲${C_DARKCYAN}██████${C_CYAN}▲${C_RESET}
+     ${C_CYAN}▲${C_DARKCYAN}███████${C_CYAN}▲${C_RESET}
+    ${C_CYAN}▲▲${C_DARKCYAN}██████${C_CYAN}▲▲${C_RESET}
+     ${C_CYAN}${C_BOLD}Arch Linux${C_RESET}"
+}
+
+get_fedora_logo() {
+    echo -e "
+         ${C_BLUE}  ______ ${C_RESET}
+        ${C_BLUE} /      \\${C_RESET}
+       ${C_BLUE}|  ${C_WHITE}●${C_BLUE}    |${C_RESET}
+       ${C_BLUE}|        |${C_RESET}
+       ${C_BLUE}|        |${C_RESET}
+        ${C_BLUE}\\______/${C_RESET}
+        ${C_BLUE}${C_BOLD}Fedora${C_RESET}"
+}
+
+get_centos_logo() {
+    echo -e "
+        ${C_PURPLE}███████╗${C_RESET}
+       ${C_PURPLE}██╔════╝${C_RESET}
+      ${C_PURPLE}███████╗${C_RESET}
+      ${C_PURPLE}╚════██║${C_RESET}
+       ${C_PURPLE}███████║${C_RESET}
+        ${C_PURPLE}╚══════╝${C_RESET}
+        ${C_PURPLE}${C_BOLD}CentOS${C_RESET}"
+}
+
+get_kali_logo() {
+    echo -e "
+         ${C_BLUE}┏━━━━━┓${C_RESET}
+        ${C_BLUE}┏┻━━━━━┻┓${C_RESET}
+       ${C_BLUE}┏┻━${C_RED}▄▄▄▄▄${C_BLUE}━┻┓${C_RESET}
+       ${C_BLUE}┃${C_RED}▄███████▄${C_BLUE}┃${C_RESET}
+       ${C_BLUE}┃${C_RED}█████████${C_BLUE}┃${C_RESET}
+        ${C_BLUE}┗${C_RED}███████${C_BLUE}┛${C_RESET}
+         ${C_BLUE}┗━━━━┛${C_RESET}
+          ${C_BLUE}${C_BOLD}Kali${C_RESET}"
+}
+
+get_mint_logo() {
+    echo -e "
+        ${C_GREEN}┏━━━━━━━━┓${C_RESET}
+        ${C_GREEN}┃${C_LIME}████████${C_GREEN}┃${C_RESET}
+        ${C_GREEN}┃${C_LIME}██${C_GREEN}┃${C_LIME}██${C_GREEN}┃${C_LIME}██${C_GREEN}┃${C_RESET}
+        ${C_GREEN}┃${C_LIME}██${C_GREEN}┃${C_LIME}██${C_GREEN}┃${C_LIME}██${C_GREEN}┃${C_RESET}
+        ${C_GREEN}┗━━┻━━┻━━┛${C_RESET}
+         ${C_GREEN}${C_BOLD}Linux Mint${C_RESET}"
+}
+
+get_opensuse_logo() {
+    echo -e "
+         ${C_GREEN} _______${C_RESET}
+        ${C_GREEN}/       \\${C_RESET}
+       ${C_GREEN}|  ${C_CYAN}●${C_RESET}${C_GREEN}      |${C_RESET}
+       ${C_GREEN}|         |${C_RESET}
+        ${C_GREEN}\\${C_CYAN}_______${C_GREEN}/${C_RESET}
+       ${C_GREEN}${C_BOLD}openSUSE${C_RESET}"
+}
+
+get_manjaro_logo() {
+    echo -e "
+      ${C_GREEN}███${C_RESET}  ${C_GREEN}███${C_RESET}  ${C_GREEN}███${C_RESET}
+      ${C_GREEN}███${C_RESET}  ${C_GREEN}███${C_RESET}  ${C_GREEN}███${C_RESET}
+      ${C_GREEN}███${C_RESET}  ${C_GREEN}███${C_RESET}  ${C_GREEN}███${C_RESET}
+      ${C_GREEN}███${C_RESET}  ${C_GREEN}███${C_RESET}  ${C_GREEN}███${C_RESET}
+      ${C_GREEN}███${C_RESET}  ${C_GREEN}███${C_RESET}  ${C_GREEN}███${C_RESET}
+                    
+       ${C_GREEN}${C_BOLD}Manjaro${C_RESET}"
+}
+
+get_macos_logo() {
+    echo -e "
+         ${C_GRAY}████${C_RESET}
+        ${C_GRAY}██████${C_RESET}
+       ${C_GRAY}████████${C_RESET}
+       ${C_GRAY}████████${C_RESET}
+        ${C_GRAY}██████${C_RESET}
+         ${C_GRAY}████${C_RESET}
+       ${C_BOLD}${C_GRAY}macOS${C_RESET}"
+}
+
+get_linux_logo() {
+    echo -e "
+          ${C_YELLOW}___${C_RESET}
+         ${C_YELLOW}(.. |${C_RESET}
+         ${C_YELLOW}(${C_RED}<>${C_YELLOW} |${C_RESET}
+        ${C_YELLOW}/ __  \\${C_RESET}
+       ${C_YELLOW}( /  \\ /|${C_RESET}
+      ${C_YELLOW}_/\\ __)/_${C_RESET}
+     ${C_YELLOW}\\/-____\\/${C_RESET}
+      ${C_YELLOW}${C_BOLD}Linux${C_RESET}"
+}
+
+get_windows_logo() {
+    echo -e "
+      ${C_BLUE}████${C_RESET}  ${C_BLUE}████${C_RESET}
+      ${C_BLUE}████${C_RESET}  ${C_BLUE}████${C_RESET}
+      
+      ${C_BLUE}████${C_RESET}  ${C_BLUE}████${C_RESET}
+      ${C_BLUE}████${C_RESET}  ${C_BLUE}████${C_RESET}
+       ${C_BOLD}Windows${C_RESET}"
+}
+
+get_android_logo() {
+    echo -e "
+        ${C_GREEN}▄ ▄${C_RESET}
+       ${C_GREEN}▄▄▄▄▄${C_RESET}
+      ${C_GREEN}█${C_DARKGRAY}●${C_RESET}${C_GREEN}███${C_DARKGRAY}●${C_GREEN}█${C_RESET}
+      ${C_GREEN}███████${C_RESET}
+       ${C_GREEN}█ █ █${C_RESET}
+       ${C_BOLD}Android${C_RESET}"
+}
+
+get_freebsd_logo() {
+    echo -e "
+         ${C_RED} _______${C_RESET}
+        ${C_RED}|  ___  |${C_RESET}
+        ${C_RED}| |   | |${C_RESET}
+        ${C_RED}| |___| |${C_RESET}
+        ${C_RED}|_______|${C_RESET}
+       ${C_RED}${C_BOLD}FreeBSD${C_RESET}"
+}
+
+get_openbsd_logo() {
+    echo -e "
+         ${C_YELLOW} _______${C_RESET}
+        ${C_YELLOW}|  ___  |${C_RESET}
+        ${C_YELLOW}| |   | |${C_RESET}
+        ${C_YELLOW}| |___| |${C_RESET}
+        ${C_YELLOW}|_______|${C_RESET}
+       ${C_YELLOW}${C_BOLD}OpenBSD${C_RESET}"
+}
+
+get_netbsd_logo() {
+    echo -e "
+         ${C_ORANGE} _______${C_RESET}
+        ${C_ORANGE}|  ___  |${C_RESET}
+        ${C_ORANGE}| |   | |${C_RESET}
+        ${C_ORANGE}| |___| |${C_RESET}
+        ${C_ORANGE}|_______|${C_RESET}
+       ${C_ORANGE}${C_BOLD}NetBSD${C_RESET}"
+}
+
+get_gentoo_logo() {
+    echo -e "
+         ${C_PURPLE}  _____${C_RESET}
+        ${C_PURPLE} /     \\${C_RESET}
+        ${C_PURPLE}| ${C_WHITE}●${C_PURPLE}   ${C_WHITE}●${C_PURPLE} |${C_RESET}
+        ${C_PURPLE}|       |${C_RESET}
+        ${C_PURPLE} \\_____/${C_RESET}
+       ${C_PURPLE}${C_BOLD}Gentoo${C_RESET}"
+}
+
+get_alpine_logo() {
+    echo -e "
+         ${C_BLUE}  ▲▲▲${C_RESET}
+        ${C_BLUE} ▲▲▲▲▲${C_RESET}
+       ${C_BLUE}▲▲▲▲▲▲▲${C_RESET}
+      ${C_BLUE}▲▲▲▲▲▲▲▲▲${C_RESET}
+     ${C_BLUE}▲▲▲▲▲▲▲▲▲▲▲${C_RESET}
+    ${C_BLUE}▲▲▲▲▲▲▲▲▲▲▲▲▲${C_RESET}
+     ${C_BLUE}${C_BOLD}Alpine${C_RESET}"
+}
+
+get_void_logo() {
+    echo -e "
+         ${C_GREEN}  ____${C_RESET}
+        ${C_GREEN} /    \\${C_RESET}
+        ${C_GREEN}|  ${C_CYAN}●${C_GREEN}   |${C_RESET}
+        ${C_GREEN}|      |${C_RESET}
+        ${C_GREEN} \\____/${C_RESET}
+       ${C_GREEN}${C_BOLD}Void Linux${C_RESET}"
+}
+
+get_slackware_logo() {
+    echo -e "
+         ${C_BLUE}  ____${C_RESET}
+        ${C_BLUE} /    \\${C_RESET}
+        ${C_BLUE}|  /\\  |${C_RESET}
+        ${C_BLUE}| /  \\ |${C_RESET}
+        ${C_BLUE}|/    \\|${C_RESET}
+       ${C_BLUE}${C_BOLD}Slackware${C_RESET}"
+}
+
+get_solus_logo() {
+    echo -e "
+         ${C_BLUE}  ____${C_RESET}
+        ${C_BLUE} /    \\${C_RESET}
+        ${C_BLUE}|  ${C_WHITE}●${C_BLUE}   |${C_RESET}
+        ${C_BLUE}|      |${C_RESET}
+        ${C_BLUE} \\____/${C_RESET}
+       ${C_BLUE}${C_BOLD}Solus${C_RESET}"
+}
+
+get_pop_os_logo() {
+    echo -e "
+         ${C_BLUE}███████╗${C_RESET}
+        ${C_BLUE}██╔════╝${C_RESET}
+        ${C_BLUE}███████╗${C_RESET}
+        ${C_BLUE}╚════██║${C_RESET}
+        ${C_BLUE}███████║${C_RESET}
+        ${C_BLUE}╚══════╝${C_RESET}
+         ${C_BLUE}${C_BOLD}Pop!_OS${C_RESET}"
+}
+
+get_elementary_logo() {
+    echo -e "
+         ${C_CYAN}  ____${C_RESET}
+        ${C_CYAN} /    \\${C_RESET}
+        ${C_CYAN}|  ${C_WHITE}●${C_CYAN}   |${C_RESET}
+        ${C_CYAN}|      |${C_RESET}
+        ${C_CYAN} \\____/${C_RESET}
+       ${C_CYAN}${C_BOLD}elementary${C_RESET}"
+}
+
+get_zorin_logo() {
+    echo -e "
+         ${C_BLUE}  ____${C_RESET}
+        ${C_BLUE} /    \\${C_RESET}
+        ${C_BLUE}|  ${C_CYAN}●${C_BLUE}   |${C_RESET}
+        ${C_BLUE}|      |${C_RESET}
+        ${C_BLUE} \\____/${C_RESET}
+       ${C_BLUE}${C_BOLD}Zorin OS${C_RESET}"
+}
+
+get_deepin_logo() {
+    echo -e "
+         ${C_GREEN}  ____${C_RESET}
+        ${C_GREEN} /    \\${C_RESET}
+        ${C_GREEN}|  ${C_BLUE}●${C_GREEN}   |${C_RESET}
+        ${C_GREEN}|      |${C_RESET}
+        ${C_GREEN} \\____/${C_RESET}
+       ${C_GREEN}${C_BOLD}Deepin${C_RESET}"
+}
+
+get_bodhi_logo() {
+    echo -e "
+         ${C_YELLOW}  ____${C_RESET}
+        ${C_YELLOW} /    \\${C_RESET}
+        ${C_YELLOW}|  ${C_ORANGE}●${C_YELLOW}   |${C_RESET}
+        ${C_YELLOW}|      |${C_RESET}
+        ${C_YELLOW} \\____/${C_RESET}
+       ${C_YELLOW}${C_BOLD}Bodhi${C_RESET}"
+}
+
+get_puppy_logo() {
+    echo -e "
+         ${C_ORANGE}  ____${C_RESET}
+        ${C_ORANGE} /    \\${C_RESET}
+        ${C_ORANGE}|  ${C_WHITE}●${C_ORANGE}   |${C_RESET}
+        ${C_ORANGE}|      |${C_RESET}
+        ${C_ORANGE} \\____/${C_RESET}
+       ${C_ORANGE}${C_BOLD}Puppy${C_RESET}"
+}
+
+get_antix_logo() {
+    echo -e "
+         ${C_RED}  ____${C_RESET}
+        ${C_RED} /    \\${C_RESET}
+        ${C_RED}|  ${C_WHITE}●${C_RED}   |${C_RESET}
+        ${C_RED}|      |${C_RESET}
+        ${C_RED} \\____/${C_RESET}
+       ${C_RED}${C_BOLD}antiX${C_RESET}"
+}
+
+get_mx_logo() {
+    echo -e "
+         ${C_WHITE}  ____${C_RESET}
+        ${C_WHITE} /    \\${C_RESET}
+        ${C_WHITE}|  ${C_BLUE}●${C_WHITE}   |${C_RESET}
+        ${C_WHITE}|      |${C_RESET}
+        ${C_WHITE} \\____/${C_RESET}
+       ${C_WHITE}${C_BOLD}MX Linux${C_RESET}"
+}
+
+get_artix_logo() {
+    echo -e "
+          ${C_BLUE}▲${C_RESET}
+         ${C_BLUE}▲▲▲${C_RESET}
+        ${C_BLUE}▲▲▲▲▲${C_RESET}
+       ${C_BLUE}▲▲${C_DARKBLUE}███${C_BLUE}▲▲${C_RESET}
+      ${C_BLUE}▲${C_DARKBLUE}██████${C_BLUE}▲${C_RESET}
+     ${C_BLUE}▲${C_DARKBLUE}███████${C_BLUE}▲${C_RESET}
+    ${C_BLUE}▲▲${C_DARKBLUE}██████${C_BLUE}▲▲${C_RESET}
+     ${C_BLUE}${C_BOLD}Artix${C_RESET}"
+}
+
+get_endeavouros_logo() {
+    echo -e "
+          ${C_PURPLE}▲${C_RESET}
+         ${C_PURPLE}▲▲▲${C_RESET}
+        ${C_PURPLE}▲▲▲▲▲${C_RESET}
+       ${C_PURPLE}▲▲${C_DARKPURPLE}███${C_PURPLE}▲▲${C_RESET}
+      ${C_PURPLE}▲${C_DARKPURPLE}██████${C_PURPLE}▲${C_RESET}
+     ${C_PURPLE}▲${C_DARKPURPLE}███████${C_PURPLE}▲${C_RESET}
+    ${C_PURPLE}▲▲${C_DARKPURPLE}██████${C_PURPLE}▲▲${C_RESET}
+     ${C_PURPLE}${C_BOLD}EndeavourOS${C_RESET}"
+}
+
+get_garuda_logo() {
+    echo -e "
+         ${C_BLUE}  ____${C_RESET}
+        ${C_BLUE} /    \\${C_RESET}
+        ${C_BLUE}|  ${C_RED}●${C_BLUE}   |${C_RESET}
+        ${C_BLUE}|      |${C_RESET}
+        ${C_BLUE} \\____/${C_RESET}
+       ${C_BLUE}${C_BOLD}Garuda${C_RESET}"
+}
+
+get_cinnamon_logo() {
+    echo -e "
+         ${C_RED}  ____${C_RESET}
+        ${C_RED} /    \\${C_RESET}
+        ${C_RED}|  ${C_ORANGE}●${C_RED}   |${C_RESET}
+        ${C_RED}|      |${C_RESET}
+        ${C_RED} \\____/${C_RESET}
+       ${C_RED}${C_BOLD}Cinnamon${C_RESET}"
+}
+
+get_mate_logo() {
+    echo -e "
+         ${C_GREEN}  ____${C_RESET}
+        ${C_GREEN} /    \\${C_RESET}
+        ${C_GREEN}|  ${C_ORANGE}●${C_GREEN}   |${C_RESET}
+        ${C_GREEN}|      |${C_RESET}
+        ${C_GREEN} \\____/${C_RESET}
+       ${C_GREEN}${C_BOLD}MATE${C_RESET}"
+}
+
+get_xfce_logo() {
+    echo -e "
+         ${C_BLUE}  ____${C_RESET}
+        ${C_BLUE} /    \\${C_RESET}
+        ${C_BLUE}|  ${C_WHITE}●${C_BLUE}   |${C_RESET}
+        ${C_BLUE}|      |${C_RESET}
+        ${C_BLUE} \\____/${C_RESET}
+       ${C_BLUE}${C_BOLD}Xfce${C_RESET}"
+}
+
+get_kde_logo() {
+    echo -e "
+         ${C_BLUE}  ____${C_RESET}
+        ${C_BLUE} /    \\${C_RESET}
+        ${C_BLUE}|  ${C_GREEN}●${C_BLUE}   |${C_RESET}
+        ${C_BLUE}|      |${C_RESET}
+        ${C_BLUE} \\____/${C_RESET}
+       ${C_BLUE}${C_BOLD}KDE Plasma${C_RESET}"
+}
+
+get_gnome_logo() {
+    echo -e "
+         ${C_PURPLE}  ____${C_RESET}
+        ${C_PURPLE} /    \\${C_RESET}
+        ${C_PURPLE}|  ${C_WHITE}●${C_PURPLE}   |${C_RESET}
+        ${C_PURPLE}|      |${C_RESET}
+        ${C_PURPLE} \\____/${C_RESET}
+       ${C_PURPLE}${C_BOLD}GNOME${C_RESET}"
+}
+
+get_budgie_logo() {
+    echo -e "
+         ${C_BLUE}  ____${C_RESET}
+        ${C_BLUE} /    \\${C_RESET}
+        ${C_BLUE}|  ${C_WHITE}●${C_BLUE}   |${C_RESET}
+        ${C_BLUE}|      |${C_RESET}
+        ${C_BLUE} \\____/${C_RESET}
+       ${C_BLUE}${C_BOLD}Budgie${C_RESET}"
+}
+
+get_lxde_logo() {
+    echo -e "
+         ${C_BLUE}  ____${C_RESET}
+        ${C_BLUE} /    \\${C_RESET}
+        ${C_BLUE}|  ${C_WHITE}●${C_BLUE}   |${C_RESET}
+        ${C_BLUE}|      |${C_RESET}
+        ${C_BLUE} \\____/${C_RESET}
+       ${C_BLUE}${C_BOLD}LXDE${C_RESET}"
+}
+
+get_lxqt_logo() {
+    echo -e "
+         ${C_CYAN}  ____${C_RESET}
+        ${C_CYAN} /    \\${C_RESET}
+        ${C_CYAN}|  ${C_BLUE}●${C_CYAN}   |${C_RESET}
+        ${C_CYAN}|      |${C_RESET}
+        ${C_CYAN} \\____/${C_RESET}
+       ${C_CYAN}${C_BOLD}LXQt${C_RESET}"
+}
+
+get_qt_logo() {
+    echo -e "
+         ${C_GREEN}  ____${C_RESET}
+        ${C_GREEN} /    \\${C_RESET}
+        ${C_GREEN}|  ${C_BLUE}●${C_GREEN}   |${C_RESET}
+        ${C_GREEN}|      |${C_RESET}
+        ${C_GREEN} \\____/${C_RESET}
+       ${C_GREEN}${C_BOLD}Qt${C_RESET}"
+}
+
+get_i3_logo() {
+    echo -e "
+         ${C_GRAY}  ____${C_RESET}
+        ${C_GRAY} /    \\${C_RESET}
+        ${C_GRAY}|  ${C_WHITE}●${C_GRAY}   |${C_RESET}
+        ${C_GRAY}|      |${C_RESET}
+        ${C_GRAY} \\____/${C_RESET}
+       ${C_GRAY}${C_BOLD}i3wm${C_RESET}"
+}
+
+get_sway_logo() {
+    echo -e "
+         ${C_CYAN}  ____${C_RESET}
+        ${C_CYAN} /    \\${C_RESET}
+        ${C_CYAN}|  ${C_WHITE}●${C_CYAN}   |${C_RESET}
+        ${C_CYAN}|      |${C_RESET}
+        ${C_CYAN} \\____/${C_RESET}
+       ${C_CYAN}${C_BOLD}Sway${C_RESET}"
+}
+
+get_hyprland_logo() {
+    echo -e "
+         ${C_CYAN}  ____${C_RESET}
+        ${C_CYAN} /    \\${C_RESET}
+        ${C_CYAN}|  ${C_WHITE}●${C_CYAN}   |${C_RESET}
+        ${C_CYAN}|      |${C_RESET}
+        ${C_CYAN} \\____/${C_RESET}
+       ${C_CYAN}${C_BOLD}Hyprland${C_RESET}"
+}
+
+get_dwm_logo() {
+    echo -e "
+         ${C_GRAY}  ____${C_RESET}
+        ${C_GRAY} /    \\${C_RESET}
+        ${C_GRAY}|  ${C_WHITE}●${C_GRAY}   |${C_RESET}
+        ${C_GRAY}|      |${C_RESET}
+        ${C_GRAY} \\____/${C_RESET}
+       ${C_GRAY}${C_BOLD}dwm${C_RESET}"
+}
+
+get_bspwm_logo() {
+    echo -e "
+         ${C_GRAY}  ____${C_RESET}
+        ${C_GRAY} /    \\${C_RESET}
+        ${C_GRAY}|  ${C_WHITE}●${C_GRAY}   |${C_RESET}
+        ${C_GRAY}|      |${C_RESET}
+        ${C_GRAY} \\____/${C_RESET}
+       ${C_GRAY}${C_BOLD}bspwm${C_RESET}"
+}
+
+get_haiku_logo() {
+    echo -e "
+         ${C_ORANGE}  ____${C_RESET}
+        ${C_ORANGE} /    \\${C_RESET}
+        ${C_ORANGE}|  ${C_YELLOW}●${C_ORANGE}   |${C_RESET}
+        ${C_ORANGE}|      |${C_RESET}
+        ${C_ORANGE} \\____/${C_RESET}
+       ${C_ORANGE}${C_BOLD}Haiku${C_RESET}"
+}
+
+get_reactos_logo() {
+    echo -e "
+         ${C_BLUE}███████╗${C_RESET}
+        ${C_BLUE}██╔════╝${C_RESET}
+        ${C_BLUE}███████╗${C_RESET}
+        ${C_BLUE}╚════██║${C_RESET}
+        ${C_BLUE}███████║${C_RESET}
+        ${C_BLUE}╚══════╝${C_RESET}
+         ${C_BLUE}${C_BOLD}ReactOS${C_RESET}"
+}
+
+get_qubes_logo() {
+    echo -e "
+         ${C_BLUE}  ____${C_RESET}
+        ${C_BLUE} /    \\${C_RESET}
+        ${C_BLUE}|  ${C_CYAN}●${C_BLUE}   |${C_RESET}
+        ${C_BLUE}|      |${C_RESET}
+        ${C_BLUE} \\____/${C_RESET}
+       ${C_BLUE}${C_BOLD}Qubes OS${C_RESET}"
+}
+
+get_tails_logo() {
+    echo -e "
+         ${C_PURPLE}  ____${C_RESET}
+        ${C_PURPLE} /    \\${C_RESET}
+        ${C_PURPLE}|  ${C_WHITE}●${C_PURPLE}   |${C_RESET}
+        ${C_PURPLE}|      |${C_RESET}
+        ${C_PURPLE} \\____/${C_RESET}
+       ${C_PURPLE}${C_BOLD}Tails${C_RESET}"
+}
+
+get_nixos_logo() {
+    echo -e "
+         ${C_CYAN}  ____${C_RESET}
+        ${C_CYAN} /    \\${C_RESET}
+        ${C_CYAN}|  ${C_BLUE}●${C_CYAN}   |${C_RESET}
+        ${C_CYAN}|      |${C_RESET}
+        ${C_CYAN} \\____/${C_RESET}
+       ${C_CYAN}${C_BOLD}NixOS${C_RESET}"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🛠️ UTILITY FUNCTIONS
+# ═══════════════════════════════════════════════════════════════════════════
+
+create_cache_dir() {
+    [[ ! -d "$CACHE_DIR" ]] && mkdir -p "$CACHE_DIR" 2>/dev/null || true
+}
+
+cache_get() {
+    local key="$1"
+    local cache_file="$CACHE_DIR/$key"
+    
+    if [[ -f "$cache_file" ]]; then
+        local cache_time=$(stat -c %Y "$cache_file" 2>/dev/null || echo 0)
+        local current_time=$(date +%s)
+        
+        if (( current_time - cache_time < CACHE_TIMEOUT )); then
+            cat "$cache_file"
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
+cache_set() {
+    local key="$1"
+    local value="$2"
+    local cache_file="$CACHE_DIR/$key"
+    
+    echo "$value" > "$cache_file" 2>/dev/null || true
+}
+
+bytes_to_human() {
+    local bytes=$1
+    local -a units=("B" "KB" "MB" "GB" "TB" "PB")
+    local unit_index=0
+    local size=$bytes
+
+    while (( $(echo "$size >= 1024" | bc -l 2>/dev/null || echo 0) )) && (( unit_index < ${#units[@]} - 1 )); do
+        size=$(echo "scale=2; $size / 1024" | bc -l 2>/dev/null || echo "$size")
+        ((unit_index++))
+    done
+
+    printf "%.2f %s" "$size" "${units[$unit_index]}" | sed 's/\.00 / /'
+}
+
+fix_unit_label() {
+    local str="$1"
+    
+    if [[ "$str" =~ ^([0-9.]+)([BKMGT])$ ]]; then
+        local value="${BASH_REMATCH[1]}"
+        local unit="${BASH_REMATCH[2]}"
+        
+        case "$unit" in
+            T) echo "${value} TB" ;;
+            G) echo "${value} GB" ;;
+            M) echo "${value} MB" ;;
+            K) echo "${value} KB" ;;
+            B) echo "${value} B" ;;
+            *) echo "$str" ;;
+        esac
+    else
+        echo "$str"
+    fi
+}
+
+display_row() {
+    local icon="$1"
+    local label="$2"
+    local value="$3"
+    
+    printf "%s ${C_BOLD}%-20s${C_RESET} ${C_DIM}│${C_RESET} %b\n" "$icon" "$label" "$value"
+}
+
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+draw_bar() {
+    local percentage=$1
+    local width=20
+    local filled=$(echo "scale=0; ($percentage * $width) / 100" | bc 2>/dev/null || echo 0)
+    local empty=$((width - filled))
+    
+    local bar=""
+    local color=""
+    
+    if (( $(echo "$percentage >= 90" | bc -l 2>/dev/null || echo 0) )); then
+        color="${C_RED}"
+    elif (( $(echo "$percentage >= 70" | bc -l 2>/dev/null || echo 0) )); then
+        color="${C_YELLOW}"
+    else
+        color="${C_GREEN}"
+    fi
+    
+    for ((i=0; i<filled; i++)); do
+        bar+="█"
+    done
+    
+    for ((i=0; i<empty; i++)); do
+        bar+="░"
+    done
+    
+    echo -e "${color}${bar}${C_RESET}"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🐧 INTELLIGENT OS DETECTION
+# ═══════════════════════════════════════════════════════════════════════════
+
+detect_and_get_logo() {
+    local os_name=""
+    
+    # Check for Android (Termux)
+    if [[ -d /system/app && -d /system/priv-app ]]; then
+        os_name="android"
+    # Check for WSL
+    elif grep -qi microsoft /proc/version 2>/dev/null || grep -qi WSL /proc/version 2>/dev/null; then
+        os_name="windows"
+    # Check /etc/os-release
+    elif [[ -f /etc/os-release ]]; then
+        os_name=$(grep -i '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]')
+    # macOS
+    elif [[ "$(uname -s)" == "Darwin" ]]; then
+        os_name="macos"
+    else
+        os_name="linux"
+    fi
+    
+    case "$os_name" in
+        ubuntu) get_ubuntu_logo ;;
+        debian) get_debian_logo ;;
+        arch|archarm) get_arch_logo ;;
+        manjaro) get_manjaro_logo ;;
+        fedora) get_fedora_logo ;;
+        centos) get_centos_logo ;;
+        kali) get_kali_logo ;;
+        linuxmint|mint) get_mint_logo ;;
+        opensuse|opensuse-leap|opensuse-tumbleweed|suse|sles) get_opensuse_logo ;;
+        macos|darwin) get_macos_logo ;;
+        windows) get_windows_logo ;;
+        android) get_android_logo ;;
+        freebsd) get_freebsd_logo ;;
+        openbsd) get_openbsd_logo ;;
+        netbsd) get_netbsd_logo ;;
+        gentoo) get_gentoo_logo ;;
+        alpine) get_alpine_logo ;;
+        void) get_void_logo ;;
+        slackware) get_slackware_logo ;;
+        solus) get_solus_logo ;;
+        pop|pop_os) get_pop_os_logo ;;
+        elementary) get_elementary_logo ;;
+        zorin) get_zorin_logo ;;
+        deepin) get_deepin_logo ;;
+        bodhi) get_bodhi_logo ;;
+        puppy) get_puppy_logo ;;
+        antix) get_antix_logo ;;
+        mx) get_mx_logo ;;
+        artix) get_artix_logo ;;
+        endeavouros) get_endeavouros_logo ;;
+        garuda) get_garuda_logo ;;
+        cinnamon) get_cinnamon_logo ;;
+        mate) get_mate_logo ;;
+        xfce) get_xfce_logo ;;
+        kde|plasma) get_kde_logo ;;
+        gnome) get_gnome_logo ;;
+        budgie) get_budgie_logo ;;
+        lxde) get_lxde_logo ;;
+        lxqt) get_lxqt_logo ;;
+        qt) get_qt_logo ;;
+        i3) get_i3_logo ;;
+        sway) get_sway_logo ;;
+        hyprland) get_hyprland_logo ;;
+        dwm) get_dwm_logo ;;
+        bspwm) get_bspwm_logo ;;
+        haiku) get_haiku_logo ;;
+        reactos) get_reactos_logo ;;
+        qubes) get_qubes_logo ;;
+        tails) get_tails_logo ;;
+        nixos) get_nixos_logo ;;
+        *) get_linux_logo ;;
+    esac
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 📊 SYSTEM INFORMATION COLLECTORS
+# ═══════════════════════════════════════════════════════════════════════════
+
+get_hostname() {
+    hostname 2>/dev/null || echo "Unknown"
+}
+
+get_username() {
+    echo "${USER:-${USERNAME:-$(whoami 2>/dev/null || echo "Unknown")}}"
+}
+
+get_distro() {
+    local cached
+    if cached=$(cache_get "distro"); then
+        echo "$cached"
+        return
+    fi
+    
+    local distro=""
+    
+    if [[ -d /system/app && -d /system/priv-app ]]; then
+        distro="Android (Termux)"
+    elif grep -qi microsoft /proc/version 2>/dev/null; then
+        distro="Windows Subsystem for Linux"
+    elif [[ -f /etc/os-release ]]; then
+        distro=$(grep -oP '(?<=PRETTY_NAME=").*(?=")' /etc/os-release 2>/dev/null)
+    elif command_exists lsb_release; then
+        distro=$(lsb_release -d 2>/dev/null | cut -f2)
+    elif [[ "$(uname -s)" == "Darwin" ]]; then
+        distro="macOS $(sw_vers -productVersion 2>/dev/null)"
+    else
+        distro=$(uname -s)
+    fi
+    
+    cache_set "distro" "$distro"
+    echo "$distro"
+}
+
+get_kernel() {
+    uname -r
+}
+
+get_architecture() {
+    uname -m
+}
+
+get_uptime() {
+    if command_exists uptime; then
+        uptime -p 2>/dev/null | sed 's/^up //' || uptime | awk -F'up ' '{print $2}' | awk -F',' '{print $1}'
+    else
+        echo "N/A"
+    fi
+}
+
+get_cpu_info() {
+    local cached
+    if cached=$(cache_get "cpu"); then
+        echo "$cached"
+        return
+    fi
+    
+    local cpu_info=""
+    
+    if command_exists lscpu; then
+        local cpu_model=$(lscpu 2>/dev/null | awk -F': +' '/Model name/ {print $2; exit}')
+        local cpu_cores=$(nproc 2>/dev/null || echo "N/A")
+        cpu_info="$cpu_model ($cpu_cores Cores)"
+    elif [[ -f /proc/cpuinfo ]]; then
+        local cpu_model=$(awk -F': ' '/model name/ {print $2; exit}' /proc/cpuinfo)
+        local cpu_cores=$(grep -c ^processor /proc/cpuinfo)
+        cpu_info="$cpu_model ($cpu_cores Cores)"
+    elif [[ "$(uname -s)" == "Darwin" ]]; then
+        local cpu_model=$(sysctl -n machdep.cpu.brand_string 2>/dev/null)
+        local cpu_cores=$(sysctl -n hw.ncpu 2>/dev/null)
+        cpu_info="$cpu_model ($cpu_cores Cores)"
+    else
+        cpu_info="N/A"
+    fi
+    
+    cache_set "cpu" "$cpu_info"
+    echo "$cpu_info"
+}
+
+get_gpu_info() {
+    local cached
+    if cached=$(cache_get "gpu"); then
+        echo "$cached"
+        return
+    fi
+    
+    local gpu=""
+    
+    if command_exists lspci; then
+        gpu=$(lspci 2>/dev/null | grep -i 'vga\|3d\|display' | sed 's/.*: //' | head -n1)
+    elif [[ "$(uname -s)" == "Darwin" ]]; then
+        gpu=$(system_profiler SPDisplaysDataType 2>/dev/null | awk '/Chipset Model/ {print $3, $4, $5}' | head -n1)
+    fi
+    
+    gpu="${gpu:-N/A}"
+    cache_set "gpu" "$gpu"
+    echo "$gpu"
+}
+
+get_memory_info() {
+    if command_exists free; then
+        local mem_total=$(free -b 2>/dev/null | awk '/Mem:/ {print $2}')
+        local mem_used=$(free -b 2>/dev/null | awk '/Mem:/ {print $3}')
+    elif [[ "$(uname -s)" == "Darwin" ]]; then
+        local mem_total=$(sysctl -n hw.memsize 2>/dev/null)
+        local mem_used=$(( $(vm_stat 2>/dev/null | awk '/Pages active/ {print $3}' | tr -d '.') * 4096 ))
+    else
+        echo "N/A" "N/A" "0.0"
+        return
+    fi
+    
+    if [[ -n "$mem_total" ]] && (( mem_total > 0 )); then
+        local mem_pct=$(awk "BEGIN {printf \"%.1f\", ($mem_used/$mem_total)*100}" 2>/dev/null || echo "0.0")
+        local mem_total_h=$(bytes_to_human "$mem_total")
+        local mem_used_h=$(bytes_to_human "$mem_used")
+        
+        echo "$mem_used_h" "$mem_total_h" "$mem_pct"
+    else
+        echo "N/A" "N/A" "0.0"
+    fi
+}
+
+get_swap_info() {
+    if command_exists free; then
+        local swap_total=$(free -b 2>/dev/null | awk '/Swap:/ {print $2}')
+        local swap_used=$(free -b 2>/dev/null | awk '/Swap:/ {print $3}')
+    elif [[ "$(uname -s)" == "Darwin" ]]; then
+        local swap_total=$(sysctl -n vm.swapusage 2>/dev/null | awk '{print $3}' | sed 's/M/*1048576/' | bc 2>/dev/null || echo 0)
+        local swap_used=$(sysctl -n vm.swapusage 2>/dev/null | awk '{print $6}' | sed 's/M/*1048576/' | bc 2>/dev/null || echo 0)
+    else
+        echo "N/A" "N/A" "0.0"
+        return
+    fi
+    
+    if [[ -n "$swap_total" ]] && (( swap_total > 0 )); then
+        local swap_pct=$(awk "BEGIN {printf \"%.1f\", ($swap_used/$swap_total)*100}" 2>/dev/null || echo "0.0")
+        local swap_total_h=$(bytes_to_human "$swap_total")
+        local swap_used_h=$(bytes_to_human "$swap_used")
+        
+        echo "$swap_used_h" "$swap_total_h" "$swap_pct"
+    else
+        echo "0 B" "0 B" "0.0"
+    fi
+}
+
+get_load_average() {
+    if command_exists uptime; then
+        uptime | awk -F'load average: ' '{print $2}' | awk '{print $1, $2, $3}' | tr -d ','
+    elif [[ -f /proc/loadavg ]]; then
+        awk '{print $1, $2, $3}' /proc/loadavg
+    else
+        echo "N/A"
+    fi
+}
+
+get_cpu_temperature() {
+    if command_exists sensors; then
+        local temp=$(sensors 2>/dev/null | awk '
+            /Package id 0:/ {print $4; exit}
+            /Tctl:/ {print $2; exit}
+            /Core 0:/ {print $3; exit}
+            /temp1:/ {print $2; exit}
+        ' | sed 's/+//')
+        echo "${temp:-N/A}"
+    elif [[ "$(uname -s)" == "Darwin" ]] && command_exists osx-cpu-temp; then
+        osx-cpu-temp 2>/dev/null || echo "N/A"
+    else
+        echo "N/A"
+    fi
+}
+
+get_disk_stats() {
+    local mount_point="$1"
+    
+    if ! df -h "$mount_point" &>/dev/null; then
+        echo "N/A"
+        return
+    fi
+    
+    local used=$(df -h "$mount_point" 2>/dev/null | awk 'NR==2 {print $3}')
+    local total=$(df -h "$mount_point" 2>/dev/null | awk 'NR==2 {print $2}')
+    local pct=$(df -h "$mount_point" 2>/dev/null | awk 'NR==2 {print $5}')
+    
+    echo "$(fix_unit_label "$used") / $(fix_unit_label "$total") ($pct)"
+}
+
+get_local_ip() {
+    if command_exists hostname; then
+        hostname -I 2>/dev/null | awk '{print $1}' || echo "N/A"
+    elif command_exists ip; then
+        ip route get 1 2>/dev/null | awk '{print $7; exit}' || echo "N/A"
+    elif [[ "$(uname -s)" == "Darwin" ]]; then
+        ipconfig getifaddr en0 2>/dev/null || echo "N/A"
+    else
+        echo "N/A"
+    fi
+}
+
+get_public_ip() {
+    local cached
+    if cached=$(cache_get "public_ip"); then
+        echo "$cached"
+        return
+    fi
+    
+    local public_ip=""
+    if command_exists curl; then
+        public_ip=$(curl -s --max-time 3 https://api.ipify.org 2>/dev/null || echo "N/A")
+    elif command_exists wget; then
+        public_ip=$(wget -qO- --timeout=3 https://api.ipify.org 2>/dev/null || echo "N/A")
+    else
+        public_ip="N/A"
+    fi
+    
+    cache_set "public_ip" "$public_ip"
+    echo "$public_ip"
+}
+
+get_shell() {
+    basename "$SHELL" 2>/dev/null || echo "N/A"
+}
+
+get_shell_version() {
+    local shell_name=$(get_shell)
+    case "$shell_name" in
+        bash) bash --version 2>/dev/null | head -n1 | awk '{print $4}' | cut -d'(' -f1 ;;
+        zsh) zsh --version 2>/dev/null | awk '{print $2}' ;;
+        fish) fish --version 2>/dev/null | awk '{print $3}' ;;
+        *) echo "" ;;
+    esac
+}
+
+get_packages() {
+    local count=0
+    if command_exists dpkg; then
+        count=$(dpkg -l 2>/dev/null | grep -c ^ii || echo 0)
+    elif command_exists rpm; then
+        count=$(rpm -qa 2>/dev/null | wc -l || echo 0)
+    elif command_exists pacman; then
+        count=$(pacman -Q 2>/dev/null | wc -l || echo 0)
+    elif command_exists brew; then
+        count=$(brew list 2>/dev/null | wc -l || echo 0)
+    elif command_exists pkg; then
+        count=$(pkg info 2>/dev/null | wc -l || echo 0)
+    fi
+    echo "$count"
+}
+
+get_terminal() {
+    echo "${TERM_PROGRAM:-${TERM:-Unknown}}"
+}
+
+get_de_wm() {
+    if [[ -n "${XDG_CURRENT_DESKTOP:-}" ]]; then
+        echo "$XDG_CURRENT_DESKTOP"
+    elif [[ -n "${DESKTOP_SESSION:-}" ]]; then
+        echo "$DESKTOP_SESSION"
+    elif command_exists wmctrl; then
+        wmctrl -m 2>/dev/null | grep "Name:" | cut -d: -f2 | xargs
+    else
+        echo ""
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🎨 DISPLAY FUNCTIONS
+# ═══════════════════════════════════════════════════════════════════════════
+
+display_header() {
+    echo -e "\n${C_BOLD}${C_CYAN}╔═══════════════════════════════════════════════════════════════╗${C_RESET}"
+    echo -e "${C_BOLD}${C_CYAN}║${C_RESET}              ${C_BOLD}${C_RED}⚡ UltraFetch v${FETCH_VERSION} ⚡${C_RESET}                   ${C_BOLD}${C_CYAN}║${C_RESET}"
+    echo -e "${C_BOLD}${C_CYAN}║${C_RESET}     ${C_DIM}Ultimate Professional System Information Tool${C_RESET}     ${C_BOLD}${C_CYAN}║${C_RESET}"
+    echo -e "${C_BOLD}${C_CYAN}╚═══════════════════════════════════════════════════════════════╝${C_RESET}\n"
+}
+
+display_with_logo() {
+    clear
+    display_header
+    
+    local logo
+    logo=$(detect_and_get_logo)
+    
+    mapfile -t logo_lines <<< "$logo"
+    
+    local user_host="${C_GREEN}$(get_username)${C_RESET}${C_DIM}@${C_RESET}${C_BLUE}$(get_hostname)${C_RESET}"
+    local shell_ver=$(get_shell_version)
+    local shell_display="$(get_shell)"
+    [[ -n "$shell_ver" ]] && shell_display="$shell_display $shell_ver"
+    
+    local -a info_lines=(
+        ""
+        "${C_BOLD}${C_CYAN}┌───────────────────── ${C_RED}● SYSTEM INFO${C_CYAN} ─────────────────────┐${C_RESET}"
+        "$(display_row "👤" "User@Host" "$user_host")"
+        "$(display_row "🐧" "Distribution" "${C_GREEN}$(get_distro)${C_RESET}")"
+        "$(display_row "🧠" "Kernel" "${C_BLUE}$(get_kernel)${C_RESET}")"
+        "$(display_row "🏗️ " "Architecture" "${C_PURPLE}$(get_architecture)${C_RESET}")"
+        "$(display_row "⏱️ " "Uptime" "${C_MAGENTA}$(get_uptime)${C_RESET}")"
+        "$(display_row "🐚" "Shell" "${C_PURPLE}$shell_display${C_RESET}")"
+        "$(display_row "📦" "Packages" "${C_ORANGE}$(get_packages)${C_RESET}")"
+        "$(display_row "💻" "Terminal" "${C_TEAL}$(get_terminal)${C_RESET}")"
+    )
+    
+    # Add DE/WM if available
+    local de_wm=$(get_de_wm)
+    if [[ -n "$de_wm" ]]; then
+        info_lines+=("$(display_row "🖥️ " "DE/WM" "${C_CYAN}$de_wm${C_RESET}")")
+    fi
+    
+    info_lines+=(
+        "${C_BOLD}${C_CYAN}├───────────────────── ${C_RED}● HARDWARE${C_CYAN} ────────────────────────┤${C_RESET}"
+        "$(display_row "⚙️ " "CPU" "${C_LIME}$(get_cpu_info)${C_RESET}")"
+        "$(display_row "🎮" "GPU" "${C_TEAL}$(get_gpu_info)${C_RESET}")"
+    )
+    
+    read -r mem_used mem_total mem_pct <<< "$(get_memory_info)"
+    info_lines+=("$(display_row "💾" "Memory" "${C_GREEN}$mem_used ${C_DIM}/${C_RESET} ${C_GREEN}$mem_total ${C_DIM}(${mem_pct}%)${C_RESET}")")
+    info_lines+=("${C_DIM}                       └─ $(draw_bar "$mem_pct")${C_RESET}")
+    
+    read -r swap_used swap_total swap_pct <<< "$(get_swap_info)"
+    if [[ "$swap_total" != "0 B" ]]; then
+        info_lines+=("$(display_row "💿" "Swap" "${C_CYAN}$swap_used ${C_DIM}/${C_RESET} ${C_CYAN}$swap_total ${C_DIM}(${swap_pct}%)${C_RESET}")")
+        info_lines+=("${C_DIM}                       └─ $(draw_bar "$swap_pct")${C_RESET}")
+    fi
+    
+    info_lines+=(
+        "${C_BOLD}${C_CYAN}├──────────────────── ${C_RED}● PERFORMANCE${C_CYAN} ─────────────────────┤${C_RESET}"
+        "$(display_row "📈" "Load Average" "${C_YELLOW}$(get_load_average)${C_RESET}")"
+        "$(display_row "🌡️ " "CPU Temp" "${C_ORANGE}$(get_cpu_temperature)${C_RESET}")"
+        "${C_BOLD}${C_CYAN}├────────────────────── ${C_RED}● STORAGE${C_CYAN} ─────────────────────────┤${C_RESET}"
+        "$(display_row "🗄️ " "Root (/)" "${C_BLUE}$(get_disk_stats "/")${C_RESET}")"
+    )
+    
+    # Add optional mounts
+    if mountpoint -q /var 2>/dev/null; then
+        info_lines+=("$(display_row "📁" "/var" "${C_PURPLE}$(get_disk_stats "/var")${C_RESET}")")
+    fi
+    
+    if mountpoint -q /home 2>/dev/null; then
+        info_lines+=("$(display_row "🏠" "/home" "${C_PINK}$(get_disk_stats "/home")${C_RESET}")")
+    fi
+    
+    info_lines+=(
+        "${C_BOLD}${C_CYAN}├─────────────────────── ${C_RED}● NETWORK${C_CYAN} ─────────────────────────┤${C_RESET}"
+        "$(display_row "🌐" "Local IP" "${C_CYAN}$(get_local_ip)${C_RESET}")"
+        "$(display_row "🚀" "Public IP" "${C_MAGENTA}$(get_public_ip)${C_RESET}")"
+        "${C_BOLD}${C_CYAN}└─────────────────────────────────────────────────────────────┘${C_RESET}"
+    )
+    
+    # Print side by side
+    local max_lines=${#info_lines[@]}
+    [[ ${#logo_lines[@]} -gt $max_lines ]] && max_lines=${#logo_lines[@]}
+    
+    for ((i=0; i<max_lines; i++)); do
+        printf "%-50s %b\n" "${logo_lines[i]:-}" "${info_lines[i]:-}"
+    done
+    echo ""
+}
+
+display_footer() {
+    echo -e "${C_BOLD}${C_CYAN}┌─────────────────────────────────────────────────────────────────┐${C_RESET}"
+    echo -e "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_DIM}Crafted with ${C_RED}♥${C_RESET}${C_DIM}  by ${C_BOLD}${C_RED}$FETCH_AUTHOR${C_RESET}                      ${C_BOLD}${C_CYAN}│${C_RESET}"
+    echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────┤${C_RESET}"
+    echo -e "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_GRAY}🌐 Website:${C_RESET}  ${C_UNDERLINE}${C_CYAN}https://infinityforge.tech${C_RESET}                     ${C_BOLD}${C_CYAN}│${C_RESET}"
+    echo -e "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_GRAY}💬 Discord:${C_RESET}  ${C_UNDERLINE}${C_CYAN}https://discord.gg/infinityforge${C_RESET}               ${C_BOLD}${C_CYAN}│${C_RESET}"
+    echo -e "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_GRAY}📖 GitHub:${C_RESET}   ${C_UNDERLINE}${C_CYAN}https://github.com/infinityforge${C_RESET}               ${C_BOLD}${C_CYAN}│${C_RESET}"
+    echo -e "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_GRAY}📧 Support:${C_RESET}  ${C_UNDERLINE}${C_CYAN}support@infinityforge.tech${C_RESET}                     ${C_BOLD}${C_CYAN}│${C_RESET}"
+    echo -e "${C_BOLD}${C_CYAN}└─────────────────────────────────────────────────────────────────┘${C_RESET}"
+    echo -e "${C_DIM}${C_GRAY}          Build: ${FETCH_BUILD} | 40+ OS Support | MIT Licensed${C_RESET}\n"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🎬 COMMAND LINE INTERFACE
+# ═══════════════════════════════════════════════════════════════════════════
+
+show_help() {
+    cat << EOF
+ ${C_BOLD}${C_CYAN}UltraFetch v${FETCH_VERSION}${C_RESET} - Ultimate System Information Tool
+
+ ${C_BOLD}USAGE:${C_RESET}
+    ultrafetch [OPTIONS]
+
+ ${C_BOLD}OPTIONS:${C_RESET}
+    ${C_BOLD}-h, --help${C_RESET}           Display this help message
+    ${C_BOLD}-v, --version${C_RESET}        Show detailed version information
+    ${C_BOLD}-c, --clear-cache${C_RESET}    Clear cached system information
+
+ ${C_BOLD}EXAMPLES:${C_RESET}
+    ${C_CYAN}ultrafetch${C_RESET}                   Display full system information
+    ${C_CYAN}ultrafetch --version${C_RESET}         Show version and build details
+    ${C_CYAN}ultrafetch --clear-cache${C_RESET}     Clear cached data
+
+ ${C_BOLD}AUTHOR:${C_RESET}
+    ${FETCH_AUTHOR} <support@infinityforge.tech>
+
+ ${C_BOLD}LINKS:${C_RESET}
+    Website: ${C_CYAN}https://infinityforge.tech${C_RESET}
+    GitHub:  ${C_CYAN}https://github.com/infinityforge${C_RESET}
+
+EOF
+}
+
+show_version() {
+    cat << EOF
+ ${C_BOLD}${C_RED}⚡ UltraFetch ${FETCH_VERSION} ⚡${C_RESET}
+
+ ${C_BOLD}Build:${C_RESET}        ${FETCH_BUILD}
+ ${C_BOLD}Release:${C_RESET}      Stable Production
+ ${C_BOLD}License:${C_RESET}      MIT License
+ ${C_BOLD}Platform:${C_RESET}     Universal (Linux/macOS/BSD/WSL/Android)
+
+ ${C_BOLD}Author:${C_RESET}       ${FETCH_AUTHOR}
+ ${C_BOLD}Website:${C_RESET}      ${C_CYAN}https://infinityforge.tech${C_RESET}
+
+ ${C_DIM}Copyright © 2025 InfinityForge Labs. All rights reserved.${C_RESET}
+EOF
+}
+
+clear_cache() {
+    if [[ -d "$CACHE_DIR" ]]; then
+        rm -rf "$CACHE_DIR"/* 2>/dev/null || true
+        echo -e "${C_GREEN}✓${C_RESET} Cache cleared successfully!"
+    else
+        echo -e "${C_YELLOW}!${C_RESET} No cache directory found."
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🎬 MAIN EXECUTION
+# ═══════════════════════════════════════════════════════════════════════════
+
+main() {
+    # Create cache directory
+    create_cache_dir
+    
+    # Parse arguments
+    case "${1:-}" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -v|--version)
+            show_version
+            exit 0
+            ;;
+        -c|--clear-cache)
+            clear_cache
+            exit 0
+            ;;
+        "")
+            # Normal execution
+            ;;
+        *)
+            echo -e "${C_RED}✗ Error:${C_RESET} Unknown option '$1'"
+            echo -e "Try '${C_CYAN}ultrafetch --help${C_RESET}' for more information."
+            exit 1
+            ;;
+    esac
+    
+    # Display system information
+    display_with_logo
+    display_footer
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🛡️ ERROR HANDLING & CLEANUP
+# ═══════════════════════════════════════════════════════════════════════════
+
+cleanup() {
+    echo -ne "${C_RESET}"
+}
+
+trap cleanup EXIT INT TERM
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🚀 ENTRY POINT
+# ═══════════════════════════════════════════════════════════════════════════
+
+main "$@"
+exit 0
